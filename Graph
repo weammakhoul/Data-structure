@@ -1,0 +1,621 @@
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Random;
+
+
+//by weammakhoul
+//weammakhoul 207036617
+//tamerdamouni 207293069
+
+
+/*
+You must NOT change the signatures of classes/methods in this skeleton file.
+You are required to implement the methods of this skeleton file according to the requirements.
+You are allowed to add classes, methods, and members as required.
+ */
+
+/**
+ * This class represents a graph that efficiently maintains the heaviest neighborhood over edge addition and
+ * vertex deletion.
+ *
+ */
+public class Graph {
+
+	
+	private LinkedList[] hashTable;  // HashTable
+    private MaxHeap maxHeap; // MaxHeap
+    private int size; //number of available nodes in Graph 
+    private hashing hash; // the hash function 
+    private int numberOfEdges;
+    	
+    /**
+     * Initializes the graph on a given set of nodes. The created graph is empty, i.e. it has no edges.
+     * You may assume that the ids of distinct nodes are distinct.
+     *
+     * @param nodes - an array of node objects
+     */
+    public Graph(Node [] nodes){ //O(n), which in is the nodes.length
+
+        this.size = nodes.length; // init size.
+
+        hashTable = new LinkedList[size];
+        //table = new ArrayList<LinkedList>(size); // init the hashtable.
+
+        for (int i = 0 ; i < size ; i++) { //init each cell in table with LinkedList to deal with colliding.
+            LinkedList lst = new LinkedList();
+            hashTable[i] = lst;
+        }
+
+        this.hash= new hashing(size); //init hash function.
+
+        for (int i = 0 ; i < size ; i++) { //mapping ids to the HashTable.
+            int hashVal = this.hash.hashFunc(nodes[i].getId());
+            HashNode hashnode = new HashNode(nodes[i].getId(), i); //creating hashNode 
+            hashTable[hashVal].insert(hashnode); // insert the HashNode with id.
+        }
+        
+        maxHeap = new MaxHeap(nodes); // init MaxHeap.
+
+    }
+
+    /**
+     * This method returns the node in the graph with the maximum neighborhood weight.
+     * Note: nodes that have been removed from the graph using deleteNode are no longer in the graph.
+     * @return a Node object representing the correct node. If there is no node in the graph, returns 'null'.
+     */
+    public Node maxNeighborhoodWeight(){ // O(1).
+        return size==0? null: maxHeap.get(0);
+    }
+
+
+    /**
+     * given a node id of a node in the graph, this method returns the neighborhood weight of that node.
+     *
+     * @param node_id - an id of a node.
+     * @return the neighborhood weight of the node of id 'node_id' if such a node exists in the graph.
+     * Otherwise, the function returns -1.
+     */
+    public int getNeighborhoodWeight(int node_id){ // O(1).
+        Node node=find(node_id); // returns the Node in MaxHeap
+        if(node==null) {
+            return -1;
+        }
+        return node.Bv;
+    }
+
+
+    /**
+     * This function adds an edge between the two nodes whose ids are specified.
+     * If one of these nodes is not in the graph, the function does nothing.
+     * The two nodes must be distinct; otherwise, the function does nothing.
+     * You may assume that if the two nodes are in the graph, there exists no edge between them prior to the call.
+     *
+     * @param node1_id - the id of the first node.
+     * @param node2_id - the id of the second node.
+     * @return returns 'true' if the function added an edge, otherwise returns 'false'.
+     */
+    public boolean addEdge(int node1_id, int node2_id){ // O(log n).
+    	//returns the nodes in MaxHeap.
+        Node node1=find(node1_id);
+        Node node2=find(node2_id);
+        // check if both nodes available
+        if(node1!=null &&  node2!=null) {
+        	GraphLinkedList neighbors = node1.Neighbors;
+        	
+        	//check if the nodes are distinct
+        	GraphNode head = neighbors.head;
+        	while(head != null) {
+        		if (head.getValue() == node2.getId()) {
+        			return false;
+        		}
+        		head = head.next;
+        	}
+        	
+        	//in case the nodes are district ,reach neighbors of both nodes
+            GraphLinkedList node1DLL =node1.Neighbors;
+            GraphLinkedList node2DLL =node2.Neighbors;
+            
+            //create GraphNode.
+            GraphNode g1 = new GraphNode(node1_id);
+            GraphNode g2 = new GraphNode(node2_id);
+            //set parallel Node, pointer for the same edge.
+            g1.setParallel(g2);
+            g2.setParallel(g1);
+            //insert to neighbors.
+            node1DLL.insertFirst(g2);
+            node2DLL.insertFirst(g1);
+            
+            numberOfEdges+=1;
+
+            node1.Bv += node2.getWeight();
+            int index1 = findNodeInHashTable(node1_id).indexInHeap; 
+            this.maxHeap.heapify_up(index1);
+
+            node2.Bv += node1.getWeight();
+            int index2 = findNodeInHashTable(node2_id).indexInHeap;
+            this.maxHeap.heapify_up(index2);
+
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Given the id of a node in the graph, deletes the node of that id from the graph, if it exists.
+     *
+     * @param node_id - the id of the node to delete.
+     * @return returns 'true' if the function deleted a node, otherwise returns 'false'
+     */
+    public boolean deleteNode(int node_id){ // we have to delete the node in both HashTable and MaxHeap , 
+    	// O((number of neighbors + 1)*(log n))
+
+    	HashNode HashnodeToDelete = findNodeInHashTable(node_id); // find in HashTable
+        if (HashnodeToDelete==null){
+            return false;
+        }
+        
+        int LastValue = this.maxHeap.Heap[size-1].id;
+    	HashNode lastInHeap = findNodeInHashTable(LastValue); // find in HashTable
+        //swap(index, size-1);
+    	this.maxHeap.swap(HashnodeToDelete.indexInHeap, lastInHeap.indexInHeap);
+        //changeIndexOfNode(index , Heap[index].getId() , size-1 , Heap[size-1].getId());
+        this.maxHeap.changeIndexOfNode(HashnodeToDelete.indexInHeap , maxHeap.Heap[HashnodeToDelete.indexInHeap].getId() , 
+        		size-1 , maxHeap.Heap[size-1].getId());
+        
+    	size-=1;
+    	this.maxHeap.size -= 1;
+    	
+    	this.maxHeap.heapify_down(lastInHeap.indexInHeap);
+    	
+
+        //finds the node we need to delete in Heap.
+        Node nodeToDelete = this.maxHeap.get(HashnodeToDelete.indexInHeap);
+        // the neighbors of the node wee need to delete, starting be the head.
+        GraphNode neighbor =nodeToDelete.Neighbors.head;
+
+        while(neighbor != null){ // loop to delete all edges.
+
+        	//find the neighbor in MaxHeap to reduce Bv.
+            Node parallelNode = this.find(neighbor.value);   
+            // reach neighbors of the neighbor to delete Node with node_id.  
+            GraphLinkedList linkedNeighbor= parallelNode.Neighbors;
+            
+            parallelNode.Bv = parallelNode.Bv - nodeToDelete.weight;
+            // delete edge from neighbor to NodeToDelete.
+            
+            linkedNeighbor.delete(neighbor.parallel);
+
+        	HashNode HeapifyNeighbor = findNodeInHashTable(parallelNode.id); // find in HashTable
+            this.maxHeap.heapify_down(HeapifyNeighbor.indexInHeap);
+            
+            neighbor=neighbor.next;
+            numberOfEdges -=1;
+            
+            
+        }
+
+        nodeToDelete.Neighbors = null; // delete all edges from the NodeToDelete.
+                
+        int index = this.hash.hashFunc(node_id);
+        LinkedList listInHash = hashTable[index]; //reach LinkedList that contain node_id.
+        listInHash.delete(node_id); // delete in linkedList.
+        
+        return true;
+    }
+
+    /**
+     * Returns the number of nodes currently in the graph.
+     * @return the number of nodes in the graph.
+     */
+    public int getNumNodes(){ // O(1).
+        return this.size;
+    }
+
+    /**
+     * Returns the number of edges currently in the graph.
+     * @return the number of edges currently in the graph.
+     */
+    public int getNumEdges(){ // O(1).
+        return numberOfEdges;
+    }
+
+    /**
+     * This class represents a node in the graph.
+     */
+    public static class Node{
+
+        private int id;
+        private int weight;
+        private int Bv =0 ; //weight of the Node + weight of neighbors.
+        private GraphLinkedList Neighbors; // represent neighbors using Doubly LinkedList.
+
+        /**
+         * Creates a new node object, given its id and its weight.
+         * @param id - the id of the node.
+         * @param weight - the weight of the node.
+         */
+        public Node(int id, int weight){ // O(1).
+            this.id= id; // init id 
+            this.weight = weight; // init weight
+            this.Neighbors = new GraphLinkedList(); // init Doubly Linked List
+            return;
+        }
+        
+        // we used the constructor in MaxHeap class.
+        private Node(int id, int weight,int Bv){ // O(1).
+            this.id= id;
+            this.weight = weight;
+            this.Neighbors = new GraphLinkedList(); // init Doubly Linked List
+            this.Bv=Bv; // init Bv , given a Bv .
+            return;
+        }
+
+        /**
+         * Returns the id of the node.
+         * @return the id of the node.
+         */
+        public int getId(){ // O(1).
+            return this.id;
+        }
+
+        /**
+         * Returns the weight of the node.
+         * @return the weight of the node.
+         */
+        public int getWeight(){ // O(1).
+            return this.weight;
+        }
+    }
+
+
+    /*
+     * this class represents the hash function and init it.
+     * we learned that universal hash function is : f(x) = ((a*x+b)%p)%m
+     * which 0<a<p and 0<= b < p  
+     * p = 10^9 + 9
+     */
+    private class hashing{
+        private int a;
+        private int b;
+        private int p = (int) (Math.pow(10, 9) +9);
+        private int size;
+
+     // init random a and b
+       public hashing(int size) { // O(1).
+    	   this.size = size;
+           Random random= new Random();
+           this.a = random.nextInt(p-1)+1;
+           this.b = random.nextInt(p);
+        }
+       
+       //create hash function
+        public int hashFunc(int id) { // O(1).
+            return (int)(((long)a*(id)+b)%p)%size;
+        }
+
+    }
+
+    /*
+     * this class represents the neighbors of Node in MaxHeap by creating Doubly LinkedList.
+     * this class is field in Node in MaxHeap
+     * the items in the List is specified Node for this class with name GraphNode
+     */
+    private static class GraphLinkedList{
+
+        private GraphNode head; //first Node in List
+        private int size;
+
+        public GraphLinkedList() { // init empty List,  O(1).
+            head = null;
+            size = 0 ;
+        }
+
+        public void insertFirst( GraphNode node) { // O(1).
+            if (size == 0) { //in case the list empty
+                head = node;
+            }
+            else { // otherwise.
+                GraphNode tmp = this.head;
+                head = node;
+                node.next = tmp;
+                tmp.prev = node;
+            }
+            size +=1;
+        }
+
+
+        public boolean delete(GraphNode node) { // O(1).
+            if(node.prev != null) { // case which the node is head
+                GraphNode prev = node.prev;
+                if(node.next != null) { // in case node is the only node in the list
+                    prev.next = node.next;
+                    node.next = null;
+                    prev.next.prev = prev;
+                }
+                else { // otherwise
+                    prev.next = null;
+                }
+                node.prev = null;
+            }
+            else { // in case node isn't head
+            	
+                if (node.next != null) { // in case node is the last node.
+                    this.head = node.next; 
+                    node.next  = null;
+                    this.head.prev = null;
+                }
+                else { // otherwise
+                    this.head = null;
+                }
+            }
+            size -=1;
+            return true;
+
+        }
+    }
+
+    /*
+     * this class represents the nodes in doubly Linked List 
+     * in case we have edge between n1 and n2 which n1 and n2 are nodes in graph or maxHeap.
+     * each node points to parallel node (parallel node of the GraphNode with n2.id in neighbors of the n1 is the 
+     * GraphNode in neighbors of the n2 that contain n1.id).
+     */
+    private class GraphNode{
+        private GraphNode prev = null;
+        private GraphNode next = null;
+        private GraphNode parallel = null;
+        private int value; //id neighbor
+
+        public GraphNode(int value){ // O(1).
+            this.value = value;
+
+        }
+        public void setParallel(GraphNode parallel){ // O(1).
+            this.parallel=parallel;
+        }
+
+        public int getValue() { // O(1).
+            return this.value;
+        }
+    }
+
+    /*
+     * this class represents LinkedList in hash table that dealing with colliding.
+     * this class used in this.table.
+     */
+    private class LinkedList {
+
+        private HashNode head;
+        private int size;
+
+        public LinkedList() {  // O(1).
+            head = null;
+            size= 0 ;
+        }
+
+
+        public void insert(HashNode node) {  // O(1).
+            if (size == 0) { // in case empty list
+                head = node;
+            }
+            else { //otherwise
+                HashNode tmp = this.head;
+                head = node;
+                node.next = tmp;
+            }
+            size +=1;
+        }
+
+        public boolean delete(int id) {  // O(m) , which m is number of hashNodes in LinkdedList.
+
+            HashNode currNode=this.head;
+            HashNode prev = null; // saved the prev Node beacuse the list isn't doubly.
+            if (currNode!=null && currNode.getId()==id){ // check if currNode first item in the list.
+                this.head=currNode.getNext();
+                currNode.next=null;
+                size-=1;
+                return true;
+            }
+            while (currNode!=null && currNode.getId()!=id){ // finding the Node with the appropriate id.
+                prev=currNode;
+                currNode=currNode.getNext();
+            }
+            if (currNode!=null) { //deleting the node by changing pointers.
+                prev.next=currNode.getNext();
+                currNode.next=null;
+                size-=1;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /*
+     * this class represents the item in hashTable
+     * each node contains id of the appropriate node on maxHeap,
+     * in addition to indexInHeap which is the index in max Heap of the appropriate node in maxHeap.
+     * we initiated field indexInHeap to reach nodes in heap in O(1) time.
+     */
+    public class HashNode{
+        private int id;
+        private int indexInHeap;
+        private HashNode next;
+
+        
+        public HashNode(int id, int indexInHeap) {  // O(1).
+            this.id= id;
+            this.indexInHeap = indexInHeap;
+        }
+
+
+        public void setIndex(int indexInHeap) {  // O(1).
+            this.indexInHeap = indexInHeap;
+        }
+
+        public HashNode getNext() {  // O(1).
+            return next;
+        }
+
+        public  int getId() {
+            return id;
+        }
+
+    }
+
+    /*
+     * class MaxHeap as we learned in class
+     * we used maxHeap class to get in the Node with max Bv in O(1) time.
+     */
+    public class MaxHeap{
+        private Node[] Heap;
+        private int size;
+
+        public  MaxHeap(Node[] Array){ //Constructor for MaxHeap, O(n) which n is array.length .
+            size  = Array.length; // init size
+            Heap = new Node[size]; // init Heap
+            for (int i=0; i<size;i++){
+                Heap[i]=new Node(Array[i].getId(), Array[i].getWeight(),Array[i].getWeight());
+            }
+           heapify(); // sort Heap
+        }
+        
+        public void changeIndexOfNode(int index1, int id1 ,int index2 , int id2) {
+        	// find both HashNodes in hashtable to reach indexInHeap field
+            HashNode node_i = findNodeInHashTable(id1);
+            HashNode node_largest = findNodeInHashTable(id2);
+
+            if (node_i !=null && node_largest != null) {
+                node_i.setIndex(index1);
+                node_largest.setIndex(index2);
+            }
+			
+		}
+        
+
+		/*
+         * this function using Heapify down to sort all nodes that aren't leaves in appropriate tree that 
+         * represents the MaxHeap,  and we learend sort Heap using this function is O(n), which n is number 
+         * of nodes in MaxHeap.
+         */
+        private void heapify(){ // O(n).
+            int start = (int) Math.ceil(size/2)-1; //largest index in Heap that we start from and start to sort.
+            for(int i =start ; i>=0 ; i--) {
+                this.heapify_down(i);
+            }
+        }
+
+        private void heapify_down(int i) { // O(log n).
+        	
+            // get left and right child of node at index `i`
+            int left = leftChild(i);
+            int right = rightChild(i);
+
+            int largest = i;
+
+            // checks if leftchild is bigger than node.
+            if (left < size && Heap[left].Bv > Heap[i].Bv) {
+                largest = left;
+            }
+
+            //checks if rightchild bigger than leftchild and node or bigger the node
+            if (right < size && Heap[right].Bv > Heap[largest].Bv) {
+                largest = right;
+            }
+            
+            // in case a child is bigger than node
+            if (largest != i)
+            {
+                // swap with a child having greater value
+                swap(i, largest); 
+                
+                // change fielf indexInHeap of both nodes in the appropriate HashNode in hash table
+                changeIndexOfNode(i , Heap[i].getId() , largest , Heap[largest].getId());
+
+                // call heapify-down on the child
+                heapify_down(largest);
+            }
+        }
+        
+        // returns left child of node in the tree that represents in MaxHeap
+        private int leftChild(int i) { // O(1).
+            return (2*i + 1);
+        }
+        
+        // returns right child of node in the tree that represents in MaxHeap
+        private int rightChild(int i) { // O(1).
+            return (2*i + 2);
+        }
+        
+        // this function switch the location on two given nodes in Maxheap.
+        void swap(int x, int y) { // O(1).
+            // swap with a child having greater value
+            Node temp = Heap[x];
+            Heap[x]=Heap[y];
+            Heap[y]=temp;
+        }
+        
+        /*
+         * we used this function after adding edge between to nodes, we heapfiy up because we increase the Bv of
+         * both nodes, then if there is invalid order , it must be with the parent of the node. 
+         */
+        private void heapify_up(int i) { // O(log n).
+            // check if the node at index `i` and its parent violates
+            // the heap property
+            if (i > 0 && Heap[parent(i)].Bv< Heap[i].Bv) {
+                // swap the two if heap property is violated
+                swap(i, parent(i));
+                changeIndexOfNode(i ,Heap[i].getId(),parent(i),Heap[parent(i)].getId());
+                // call heapify-up on the parent
+                heapify_up(parent(i));
+            }
+        }
+        
+        
+        private int parent(int i){ // O(1).
+            // if `i` is already a root node
+            if (i == 0) {
+                return 0;
+            }
+
+            return (i - 1) / 2;
+        }
+       
+        private Node get (int index){ // O(1).
+            return Heap[index];
+        }
+    }
+
+
+    // find node in MaxHeap using indexInHeap field in O(1) time.
+    private Node find(int node_id) { 
+        int index = this.hash.hashFunc(node_id); //find which LinkedList contains HashNode with id= node_id.
+        LinkedList currentLL = hashTable[index]; //reach the appropriate LinkedList
+        HashNode currentNode = currentLL.head; 
+        while(currentNode != null) { // reaching the HashNode.
+            if(currentNode.getId()==node_id) {
+            	Node node= maxHeap.get(currentNode.indexInHeap);
+                return maxHeap.get(currentNode.indexInHeap); //return the Node in MaxHeap[inedxInHeap]
+            }
+            currentNode=currentNode.getNext();
+        }
+        return null;
+    }
+
+    // same as find but returns hashNode 
+    private HashNode findNodeInHashTable(int node_id) {
+        int index = this.hash.hashFunc(node_id);
+        LinkedList currentLL = hashTable[index];
+        HashNode currentNode = currentLL.head;
+        while(currentNode != null) {
+            if(currentNode.getId()==node_id) {
+                return currentNode;
+            }
+            currentNode=currentNode.getNext();
+        }
+        return null;
+    }
+
+
+}
+
+
