@@ -2,12 +2,6 @@ import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Random;
 
-/*
-You must NOT change the signatures of classes/methods in this skeleton file.
-You are required to implement the methods of this skeleton file according to the requirements.
-You are allowed to add classes, methods, and members as required.
- */
-
 /**
  * This class represents a graph that efficiently maintains the heaviest neighborhood over edge addition and
  * vertex deletion.
